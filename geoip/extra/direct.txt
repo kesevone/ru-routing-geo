@@ -1,0 +1,6 @@
+# Extra CIDRs routed DIRECT on top of Russian ranges.
+# One CIDR per line. Keep this list short and explain each entry.
+
+# nalog.ru personal accounts (pinned in client DNS hosts)
+213.24.64.175/32
+213.24.64.181/32

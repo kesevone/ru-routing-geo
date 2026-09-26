@@ -1,0 +1,131 @@
+name: build
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "40 3 * * *"
+  push:
+    branches: [main]
+    paths-ignore: ["README.md"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CURL: curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout builders and upstream data
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/Loyalsoldier/geoip _geoip
+          git clone --depth 1 https://github.com/v2fly/domain-list-community _dlc
+          git clone --depth 1 https://github.com/hydraponique/roscomvpn-geosite _roscom_geosite
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Download inputs
+        working-directory: geoip
+        run: |
+          set -euo pipefail
+          mkdir -p inputs
+          $CURL -o inputs/roscom-geoip.dat      https://raw.githubusercontent.com/hydraponique/roscomvpn-geoip/release/geoip.dat
+          $CURL -o inputs/ipverse-ru-v4.txt     https://raw.githubusercontent.com/ipverse/country-ip-blocks/master/country/ru/ipv4-aggregated.txt
+          $CURL -o inputs/ipverse-ru-v6.txt     https://raw.githubusercontent.com/ipverse/country-ip-blocks/master/country/ru/ipv6-aggregated.txt
+          $CURL -o inputs/hxehex-cidr.txt       https://raw.githubusercontent.com/hxehex/russia-mobile-internet-whitelist/main/cidrwhitelist.txt
+          $CURL -o inputs/hxehex-whitelist.txt  https://raw.githubusercontent.com/hxehex/russia-mobile-internet-whitelist/main/whitelist.txt
+          $CURL -o inputs/escapingworm-cidr.txt https://raw.githubusercontent.com/escapingworm/russia-whitelist/refs/heads/main/ru-whitelist-cidr.txt
+          $CURL -o inputs/refilter-ipsum.txt    https://raw.githubusercontent.com/1andrevich/Re-filter-lists/refs/heads/main/ipsum.lst
+          grep -vhE '^\s*(#|$)' extra/direct.txt > inputs/extra-direct.txt
+          for f in inputs/*.txt; do
+            test -s "$f" || { echo "empty input: $f"; exit 1; }
+            grep -vE '^\s*(#|$)' "$f" | sed 's/\r$//' | sort -u > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+          wc -l inputs/*.txt
+          ls -l inputs/roscom-geoip.dat
+
+      - name: Build geoip.dat
+        run: |
+          set -euo pipefail
+          (cd _geoip && go build -o ../geoip-tool .)
+          (cd geoip && ../geoip-tool convert -c config.json)
+          ls -l geoip/output/dat
+
+      - name: Build geosite.dat
+        run: |
+          set -euo pipefail
+          python3 geosite/build.py _roscom_geosite/data _dlc/data geoip/inputs/hxehex-whitelist.txt geosite/extra _geosite_data
+          mkdir -p _out
+          (cd _dlc && go run ./ --datapath=../_geosite_data --outputname=geosite.dat --outputdir=../_out)
+          ls -l _out
+
+      - name: Check categories
+        run: python3 tools/check.py geoip/output/dat/geoip.dat _out/geosite.dat required.txt
+
+      - name: Load test with Xray
+        run: |
+          set -euo pipefail
+          $CURL -o /tmp/xray.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+          mkdir -p /tmp/xray && unzip -oq /tmp/xray.zip -d /tmp/xray
+          mkdir -p /tmp/assets && cp geoip/output/dat/geoip.dat _out/geosite.dat /tmp/assets/
+          python3 - <<'PY'
+          import json
+          req = [l.split("#")[0].strip() for l in open("required.txt") if l.split("#")[0].strip()]
+          cfg = {
+              "log": {"loglevel": "warning"},
+              "inbounds": [{"listen": "127.0.0.1", "port": 10808, "protocol": "socks"}],
+              "outbounds": [{"protocol": "freedom", "tag": "direct"}, {"protocol": "blackhole", "tag": "block"}],
+              "routing": {"domainStrategy": "IPIfNonMatch", "rules": [
+                  {"type": "field", "domain": [r for r in req if r.startswith("geosite:")], "outboundTag": "direct"},
+                  {"type": "field", "ip": [r for r in req if r.startswith("geoip:")], "outboundTag": "direct"}]}}
+          json.dump(cfg, open("/tmp/test.json", "w"))
+          PY
+          /tmp/xray/xray version | head -1
+          XRAY_LOCATION_ASSET=/tmp/assets /tmp/xray/xray run -test -c /tmp/test.json
+
+      - name: Prepare release
+        run: |
+          set -euo pipefail
+          TAG=$(date -u +%Y%m%d%H%M)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          rm -rf release && mkdir -p release/text
+          cp geoip/output/dat/geoip.dat _out/geosite.dat release/
+          cp geoip/output/text/*.txt release/text/
+          (cd release && sha256sum geoip.dat > geoip.dat.sha256 && sha256sum geosite.dat > geosite.dat.sha256)
+          ls -l release release/text
+
+      - name: Publish
+        if: github.ref_name == 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd release
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b release
+          git add -A
+          git commit -qm "release $TAG"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" release
+          cd ..
+          gh release create "$TAG" release/geoip.dat release/geosite.dat release/geoip.dat.sha256 release/geosite.dat.sha256 \
+            --title "$TAG" --notes "Automated build $TAG"
+          # keep the 14 newest releases
+          gh release list --limit 100 --json tagName --jq '.[14:][].tagName' | while read -r t; do
+            gh release delete "$t" --yes --cleanup-tag
+          done
+          for f in geoip.dat geosite.dat geoip.dat.sha256 geosite.dat.sha256; do
+            $CURL "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release/$f" > /dev/null || true
+          done

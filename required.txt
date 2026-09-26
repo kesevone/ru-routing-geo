@@ -1,0 +1,26 @@
+# Categories referenced by our client configs. The build fails if any is missing or empty.
+geoip:direct
+geoip:private
+geoip:ru
+geoip:whitelist
+geosite:apple
+geosite:category-ads
+geosite:category-ru
+geosite:epicgames
+geosite:escapefromtarkov
+geosite:faceit
+geosite:github
+geosite:google-play
+geosite:microsoft
+geosite:origin
+geosite:pinterest
+geosite:private
+geosite:riot
+geosite:steam
+geosite:telegram
+geosite:torrent
+geosite:twitch
+geosite:twitch-ads
+geosite:whitelist
+geosite:win-spy
+geosite:youtube

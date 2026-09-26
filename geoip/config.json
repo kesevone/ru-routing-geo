@@ -1,0 +1,25 @@
+{
+  "input": [
+    { "type": "v2rayGeoIPDat", "action": "add",
+      "args": { "uri": "./inputs/roscom-geoip.dat", "wantedList": ["direct", "whitelist"] } },
+
+    { "type": "text", "action": "add", "args": { "name": "ru", "uri": "./inputs/ipverse-ru-v4.txt" } },
+    { "type": "text", "action": "add", "args": { "name": "ru", "uri": "./inputs/ipverse-ru-v6.txt" } },
+
+    { "type": "text", "action": "add", "args": { "name": "direct", "uri": "./inputs/ipverse-ru-v4.txt" } },
+    { "type": "text", "action": "add", "args": { "name": "direct", "uri": "./inputs/ipverse-ru-v6.txt" } },
+    { "type": "text", "action": "add", "args": { "name": "direct", "uri": "./inputs/extra-direct.txt" } },
+    { "type": "text", "action": "remove", "args": { "name": "direct", "uri": "./inputs/refilter-ipsum.txt" } },
+
+    { "type": "text", "action": "add", "args": { "name": "whitelist", "uri": "./inputs/hxehex-cidr.txt" } },
+    { "type": "text", "action": "add", "args": { "name": "whitelist", "uri": "./inputs/escapingworm-cidr.txt" } },
+
+    { "type": "private", "action": "add" }
+  ],
+  "output": [
+    { "type": "v2rayGeoIPDat", "action": "output",
+      "args": { "outputName": "geoip.dat", "wantedList": ["ru", "direct", "whitelist", "private"] } },
+    { "type": "text", "action": "output",
+      "args": { "wantedList": ["ru", "direct", "whitelist", "private"] } }
+  ]
+}
