@@ -27,7 +27,8 @@ FROM_V2FLY = {
     "faceit": ["faceit"],
     "escapefromtarkov": ["escapefromtarkov"],
     "private": ["private"],
-    "category-ads": ["category-ads"],
+    # category-ads is referenced by block rules in every client config; v2fly's
+    # flattened list is ~10k domains, too heavy for the iOS network extension.
 }
 
 INCLUDE = re.compile(r"^include:([A-Za-z0-9!\-_.]+)")
