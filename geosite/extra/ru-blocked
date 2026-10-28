@@ -1,0 +1,5 @@
+# Blocked in Russia, inside the .ru/.su/.рф zones, missing from the itdoginfo list.
+# Client configs send this category to the tunnel before the zone-wide .ru direct rule.
+# One domain per line; a plain domain also matches its subdomains.
+club-romance.ru
+theins.ru

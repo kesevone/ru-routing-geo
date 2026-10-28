@@ -47,6 +47,7 @@ jobs:
           $CURL -o inputs/hxehex-whitelist.txt  https://raw.githubusercontent.com/hxehex/russia-mobile-internet-whitelist/main/whitelist.txt
           $CURL -o inputs/escapingworm-cidr.txt https://raw.githubusercontent.com/escapingworm/russia-whitelist/refs/heads/main/ru-whitelist-cidr.txt
           $CURL -o inputs/refilter-ipsum.txt    https://raw.githubusercontent.com/1andrevich/Re-filter-lists/refs/heads/main/ipsum.lst
+          $CURL -o inputs/itdog-inside.txt      https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst
           grep -vhE '^\s*(#|$)' extra/direct.txt > inputs/extra-direct.txt
           for f in inputs/*.txt; do
             test -s "$f" || { echo "empty input: $f"; exit 1; }
@@ -65,7 +66,7 @@ jobs:
       - name: Build geosite.dat
         run: |
           set -euo pipefail
-          python3 geosite/build.py _roscom_geosite/data _dlc/data geoip/inputs/hxehex-whitelist.txt geosite/extra _geosite_data
+          python3 geosite/build.py _roscom_geosite/data _dlc/data geoip/inputs/hxehex-whitelist.txt geosite/extra _geosite_data geoip/inputs/itdog-inside.txt
           mkdir -p _out
           (cd _dlc && go run ./ --datapath=../_geosite_data --outputname=geosite.dat --outputdir=../_out)
           ls -l _out

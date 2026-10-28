@@ -4,8 +4,12 @@ Base: every category of hydraponique/roscomvpn-geosite (keeps client configs com
 Refresh: categories below get the flattened content of the same (or listed) v2fly
 domain-list-community files appended. Whitelist gets hxehex mobile-whitelist domains.
 Our own additions live in geosite/extra/<category>.
+ru-blocked: domains blocked in Russia that sit in the .ru/.su/.рф zones (itdoginfo
+"Russia inside" list, curated and small). Client configs route this category to the
+tunnel before the zone-wide .ru direct rule.
 
 usage: build.py <roscom-data-dir> <v2fly-data-dir> <hxehex-whitelist.txt> <extra-dir> <out-dir>
+                <itdog-inside.txt>
 """
 import os, re, sys, shutil
 
@@ -32,6 +36,7 @@ FROM_V2FLY = {
 }
 
 INCLUDE = re.compile(r"^include:([A-Za-z0-9!\-_.]+)")
+RU_ZONE = re.compile(r"^[a-z0-9.\-]+\.(ru|su|xn--p1ai)$")
 
 
 def read_lines(path):
@@ -72,7 +77,7 @@ def append_unique(path, lines):
 
 
 def main():
-    roscom, v2fly, hxehex, extra, out = sys.argv[1:6]
+    roscom, v2fly, hxehex, extra, out, itdog = sys.argv[1:7]
     shutil.rmtree(out, ignore_errors=True)
     shutil.copytree(roscom, out)
     print(f"base: {len(os.listdir(out))} roscomvpn categories")
@@ -87,6 +92,10 @@ def main():
     wl = [l for l in read_lines(hxehex) if re.match(r"^[A-Za-z0-9.\-_*]+$", l)]
     wl = [l.lstrip("*.") for l in wl]
     print(f"  {'whitelist':18} +{append_unique(os.path.join(out, 'whitelist'), wl)} from hxehex")
+
+    blocked = [l.lower().lstrip("*.") for l in read_lines(itdog)]
+    blocked = [l for l in blocked if RU_ZONE.match(l)]
+    print(f"  {'ru-blocked':18} +{append_unique(os.path.join(out, 'ru-blocked'), blocked)} from itdoginfo")
 
     if os.path.isdir(extra):
         for cat in sorted(c for c in os.listdir(extra) if not c.startswith(".")):
